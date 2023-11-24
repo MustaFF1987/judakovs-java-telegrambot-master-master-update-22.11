@@ -88,16 +88,6 @@ public class JpaUserService implements UserService {
         return null; // Обработка случая, если пользователь или чат не существуют
     }
 
-    public void createNewUser(Long chatId, String username, Role role) {
-        // Создание пользователя с указанной ролью
-        JpaUser newUser = new JpaUser();
-        newUser.setChatId(chatId);
-        newUser.setUsername(username);
-        newUser.setRole(role);
-        // Сохранение пользователя в базе данных
-        userRepository.save(newUser);
-    }
-
     // метод для установки роли пользователю
     public void setUserRole(Long chatId, String role) {
         // Получаем пользователя по chatId
@@ -110,4 +100,14 @@ public class JpaUserService implements UserService {
         // Сохраняем обновленного пользователя в базе данных
         userRepository.save(user);
     }
+
+    //    public void createNewUser(Long chatId, String username, Role role) {
+//        // Создание пользователя с указанной ролью
+//        JpaUser newUser = new JpaUser();
+//        newUser.setChatId(chatId);
+//        newUser.setUsername(username);
+//        newUser.setRole(role);
+//        // Сохранение пользователя в базе данных
+//        userRepository.save(newUser);
+//    }
 }
