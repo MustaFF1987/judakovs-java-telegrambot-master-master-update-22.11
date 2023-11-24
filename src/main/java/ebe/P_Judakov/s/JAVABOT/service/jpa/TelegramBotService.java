@@ -74,7 +74,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
                 // Инициализация клавиатуры при старте чата
                 keyboardMarkup = createKeyboardMarkup();
             }
-
             if (keyboardMarkup != null) {
                 try {
                     handleCommands(update);
@@ -117,14 +116,17 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             handleUnsubscribe(chatId);
         } else if ("/stop".equals(text)) {
             sendStopMessage(chatId, keyboardMarkup);
-        } else if (text.startsWith("/getStock")) {
-            String stockTicker = getStockTickerFromMessage(text);
-            if (stockTicker != null) {
-                handleGetStockQuote(update, chatId, stockTicker, keyboardMarkup, userState);
-            } else {
-                sendTextMessageWithKeyboard(chatId, "Некорректный формат команды /getStock", keyboardMarkup);
-            }
+        } else if ("/getStock".equals(text)) {
+        sendTextMessageWithKeyboard(chatId, "Введите название тикера акции:", keyboardMarkup);
+        userState.put(chatId, "AWAITING_STOCK_TICKER");
+    } else {
+        if (userState.containsKey(chatId) && userState.get(chatId).equals("AWAITING_STOCK_TICKER")) {
+            handleGetStockQuote(update, chatId, text, keyboardMarkup, userState);
+            userState.remove(chatId); // После обработки тикера убрать состояние ожидания
+        } else {
+            sendTextMessageWithKeyboard(chatId, "Введите корректную команду или название тикера акции", keyboardMarkup);
         }
+      }
     }
 
     // Обработка получения котировок акций
@@ -167,6 +169,51 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         return null;
     }
 
+    // Метод для запроса информации о котировках акции через API
+    public String fetchStockQuoteInfo(String stockTicker) {
+        try {
+            // Базовый URL для запроса к API
+            String baseUrl = "https://alpha-vantage.p.rapidapi.com/query";
+
+            // Задание функции запроса (GLOBAL_QUOTE) и символа акции
+            String function = "GLOBAL_QUOTE";
+            String symbol = stockTicker;
+
+            // Создание клиента HTTP запросов
+            OkHttpClient client = new OkHttpClient();
+
+            // Построение URL запроса с необходимыми параметрами
+            HttpUrl.Builder urlBuilder = HttpUrl.parse(baseUrl)
+                    .newBuilder()
+                    .addQueryParameter("function", function)
+                    .addQueryParameter("symbol", symbol);
+
+            String url = urlBuilder.build().toString();
+
+            // Формирование и отправка GET запроса
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("X-RapidAPI-Key", "4dfa492779msh47fb50b07bc7c09p11ff37jsn1c0c729af2c0") // Замените на свой ключ
+                    .addHeader("X-RapidAPI-Host", "alpha-vantage.p.rapidapi.com")
+                    .get()
+                    .build();
+
+            // Получение ответа от сервера
+            Response response = client.newCall(request).execute();
+
+            // Проверка успешности запроса и получение информации о котировках
+            if (response.isSuccessful()) {
+                return response.body().string();
+            } else {
+                return null;
+            }
+        } catch (IOException e) {
+            // Вывод информации об ошибке в случае возникновения исключения
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     private String processUserTicker(String userInputTicker) {
         // Преобразование тикера акции в верхний регистр (пример логики обработки)
         return userInputTicker.toUpperCase(); // Возвращаем тикер акции в верхнем регистре
@@ -177,13 +224,44 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         try {
             // Ваш код для отправки запроса к API для получения информации о котировках акции
             // В данном примере, используется заглушка и вывод в консоль
+            System.out.println("Запрос к API для получения информации о котировках акции с тикером " + stockTicker);
 
-            System.out.println("Запрос к API для получения информации о котировках акции с тикером: " + stockTicker);
-
-            // sendTextMessageWithKeyboard(chatId, stockQuoteInfo, keyboardMarkup);
-
+            // Проверка наличия актуальной клавиатуры
+            if (keyboardMarkup != null) {
+                // Отправка сообщения с использованием клавиатуры
+                sendTextMessageWithKeyboard(chatId, "Информации о котировках акции " + stockTicker + " :", keyboardMarkup);
+                System.out.println("Отправка информации о котировках акции " + stockTicker + " прошла успешно");
+            } else {
+                // Если клавиатура не установлена, отправляем сообщение без нее
+                sendTextMessage(chatId, "Информации о котировках акции " + stockTicker + " :");
+                System.out.println("Отправка информации о котировках акции " + stockTicker + " прошла успешно");
+            }
         } catch (Exception e) {
-            e.printStackTrace(); // Обработка ошибок при запросе к API или отправке сообщения
+            // Обработка ошибок при запросе к API или отправке сообщения
+            e.printStackTrace();
+        }
+    }
+
+    private void sendTextMessage(long chatId, String message) {
+        try {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(String.valueOf(chatId));
+            sendMessage.setText(message);
+            execute(sendMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendTextMessageWithKeyboard(long chatId, String message, ReplyKeyboardMarkup keyboardMarkup) {
+        try {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(String.valueOf(chatId));
+            sendMessage.setText(message);
+            sendMessage.setReplyMarkup(keyboardMarkup);
+            execute(sendMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -374,31 +452,35 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
     // Метод для обработки входящих сообщений
     public void processIncomingMessage(Update update) throws TelegramApiException {
+
+        // Проверяем, есть ли сообщение в обновлении
         if (update.hasMessage()) {
-            Long chatId = update.getMessage().getChatId();
+            Long chatId = update.getMessage().getChatId(); // Получаем идентификатор чата
 
+            // Проверяем наличие клавиатуры
             if (keyboardMarkup != null) {
-                if (update.getMessage().hasText()) {
-                    Message message = update.getMessage();
-                    String text = message.getText();
+                Message message = update.getMessage();
 
-                    // Ваш код для обработки текстовых сообщений
+                // Проверяем, содержит ли сообщение текст
+                if (message.hasText()) {
+                    String text = message.getText(); // Получаем текст сообщения
+
+                    // Обработка текстовых сообщений
                     String responseText = "Ваше сообщение: " + text;
 
-                    // Отправка ответа пользователю с использованием клавиатуры
+                    // Отправка ответа пользователю с клавиатурой
                     sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
-                } else if (update.getMessage().hasPhoto()) {
-                    // Обработка сообщений с фотографиями
-                    Message message = update.getMessage();
-                    String caption = message.getCaption();
+                } else if (message.hasPhoto()) { // Проверяем, содержит ли сообщение фотографию
+                    String caption = message.getCaption(); // Получаем подпись к фотографии
 
-                    // Ваш код для обработки сообщений с фотографиями
+                    // Обработка сообщений с фотографиями
                     String responseText = "Вы отправили фотографию с подписью: " + caption;
 
-                    // Отправка ответа пользователю с использованием клавиатуры
+                    // Отправка ответа пользователю с клавиатурой
                     sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
                 }
             } else {
+                // Действия, если клавиатура отсутствует
             }
         }
     }
@@ -578,15 +660,19 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             String change = globalQuote.getString("09. change");
             String changePercent = globalQuote.getString("10. change percent");
 
-            // Формирование сообщения для отправки пользователю
+            // Создание сообщения с информацией о котировках для отправки пользователю
             String message = String.format(
                     "Symbol: %s\nOpen: %s\nHigh: %s\nLow: %s\nPrice: %s\nVolume: %s\nLatest Trading Day: %s\nPrevious Close: %s\nChange: %s\nChange Percent: %s",
                     symbol, open, high, low, price, volume, latestTradingDay, previousClose, change, changePercent
             );
 
+            // Вывод информации о котировках в логи
+            System.out.println(message);
+
             // Отправка сообщения пользователю
             sendCustomKeyboardMessage(chatId, message, keyboardMarkup);
         }
+
 
 
 
@@ -627,7 +713,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
                 if (text.equals("/getStock")) {
                     sendEnterStockTickerMessage(chatId, null );
                 } else {
-                    // Обработка тикера акции, если он был введен после команды /getSchtok
+                    // Обработка тикера акции, если он был введен после команды /getStock
                     handleGetStockQuote(chatId, text, keyboardMarkup, userState);
                 }
             }
