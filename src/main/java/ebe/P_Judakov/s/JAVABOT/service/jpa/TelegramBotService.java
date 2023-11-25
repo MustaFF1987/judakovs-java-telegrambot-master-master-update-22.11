@@ -121,17 +121,27 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         super.onRegister();
     }
 
-    /**
-     * Обрабатывает команды и текстовые сообщения, полученные в обновлении (Update).
-     * В зависимости от содержания сообщения выполняет соответствующие действия, связанные с командами бота.
-     *
-     * @param update Объект Update, содержащий информацию о сообщении и обновлении в Telegram.
-     *               Update используется для анализа и обработки входящих сообщений и команд от пользователя.
-     * @throws TelegramApiException Исключение, которое может быть выброшено в процессе взаимодействия с API Telegram.
-     */
 
-    private boolean isSubscribed = false; // Флаг для отслеживания состояния подписки
+    /**
+     * Флаг для отслеживания состояния подписки.
+     * Переменная указывает, подписан ли пользователь на определенные уведомления от бота.
+     */
+    private boolean isSubscribed = false;
+
+
+    /**
+     * Флаг для отслеживания состояния остановки бота.
+     * Переменная указывает, находится ли бот в остановленном состоянии.
+     */
     private boolean isStopped = false; // Флаг для отслеживания состояния остановки бота
+
+
+    /**
+     * Обрабатывает команды пользователя и управляет логикой бота в зависимости от введенных команд.
+     *
+     * @param update объект типа Update, содержащий информацию о сообщении пользователя
+     * @throws TelegramApiException если происходит ошибка при взаимодействии с Telegram API
+     */
 
     private void handleCommands(Update update) throws TelegramApiException {
         String text = update.getMessage().getText();
@@ -206,7 +216,12 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-    // Метод для удаления кнопки из клавиатуры
+    /**
+     * Метод для удаления кнопки из клавиатуры.
+     * При вызове данного метода удаляется кнопка с указанным текстом из клавиатуры.
+     *
+     * @param buttonText Текст кнопки, которую необходимо удалить из клавиатуры.
+     */
     private void removeButtonFromKeyboard(String buttonText) {
         if (keyboardMarkup != null && keyboardMarkup.getKeyboard() != null) {
             List<KeyboardRow> keyboard = keyboardMarkup.getKeyboard();
@@ -217,7 +232,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-        // Метод для отправки обновленной клавиатуры пользователю без нажатой кнопки
+    /**
+     * Метод для отправки обновленной клавиатуры пользователю без нажатой кнопки.
+     * При вызове данного метода создается новая клавиатура без указанной кнопки и отправляется пользователю.
+     *
+     * @param chatId  Уникальный идентификатор чата, куда будет отправлена обновленная клавиатура.
+     * @param buttons Массив строк, представляющих кнопки, которые будут отображены в новой клавиатуре.
+     */
         private void sendUpdatedKeyboard(Long chatId, String... buttons) {
             if (keyboardMarkup != null) {
                 ReplyKeyboardMarkup updatedKeyboard = new ReplyKeyboardMarkup();
@@ -249,8 +270,20 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             }
         }
 
+    /**
+     * Хранит статус подписки пользователей по их уникальному идентификатору чата.
+     * Ключом является уникальный идентификатор чата пользователя, а значением -
+     * статус подписки (true - подписан, false - не подписан).
+     */
     private Map<Long, Boolean> subscriptionStatus = new HashMap<>();
 
+    /**
+     * Обрабатывает подписку пользователя на уведомления.
+     * Метод подписывает пользователя на уведомления, отправляет текстовое сообщение
+     * с клавиатурой выбора частоты уведомлений и сохраняет состояние подписки для данного чата.
+     * @param chatId уникальный идентификатор чата пользователя
+     * @throws TelegramApiException в случае возникновения ошибок при работе с Telegram API
+     */
     private void handleSubscribeSchedule(Long chatId) throws TelegramApiException {
         // Подписываем пользователя на уведомления
         SubscriptionManager.subscribe(chatId);
@@ -259,19 +292,29 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         String responseText = "Вы подписались на уведомления от бота. Выберите частоту уведомлений:";
         ReplyKeyboardMarkup frequencyKeyboard = createFrequencyKeyboard();
         sendTextMessageWithKeyboard(chatId, responseText, frequencyKeyboard);
+
         // Сохраняем состояние подписки для данного чата
         subscriptionStatus.put(chatId, true);
+
         // Устанавливаем роль пользователя в системе
         jpaUserService.setUserRole(chatId, "USER");
+
         // Добавляем пустого бота в чат (возможно, для каких-то дополнительных действий)
         addEmptyBotToChat(chatId.toString());
     }
 
+    /**
+     * Создает клавиатуру выбора частоты уведомлений.
+     * Метод создает и возвращает ReplyKeyboardMarkup, который представляет клавиатуру
+     * для выбора частоты уведомлений (ежедневные, еженедельные, ежемесячные).
+     * @return объект ReplyKeyboardMarkup с клавиатурой для выбора частоты уведомлений
+     */
     private ReplyKeyboardMarkup createFrequencyKeyboard() {
         ReplyKeyboardMarkup frequencyKeyboard = new ReplyKeyboardMarkup();
         frequencyKeyboard.setSelective(true);
         frequencyKeyboard.setResizeKeyboard(true);
         frequencyKeyboard.setOneTimeKeyboard(false);
+
         List<KeyboardRow> keyboard = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
         row.add("Daily");
@@ -284,6 +327,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         return frequencyKeyboard;
     }
 
+    /**
+     * Обрабатывает подписку на ежедневные уведомления.
+     * Выполняет необходимые действия для подписки пользователя на ежедневные уведомления,
+     * отправляет подтверждение об успешной подписке на указанный чат.
+     *
+     * @param chatId ID чата, для которого выполняется подписка на уведомления
+     */
     private void handleDailySubscription(Long chatId) {
         // Обработка подписки на уведомления ежедневно
         // Вызов метода, который будет отправлять уведомления ежедневно
@@ -298,7 +348,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-
+    /**
+     * Обрабатывает подписку на еженедельные уведомления.
+     * Выполняет необходимые действия для подписки пользователя на еженедельные уведомления,
+     * отправляет подтверждение об успешной подписке на указанный чат.
+     *
+     * @param chatId ID чата, для которого выполняется подписка на уведомления
+     */
     private void handleWeeklySubscription(Long chatId) {
         // Обработка подписки на уведомления еженедельно
         // Вызов метода, который будет отправлять уведомления ежедневно
@@ -313,6 +369,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
+    /**
+     * Обрабатывает подписку на ежемесячные уведомления.
+     * Выполняет необходимые действия для подписки пользователя на ежемесячные уведомления,
+     * отправляет подтверждение об успешной подписке на указанный чат.
+     *
+     * @param chatId ID чата, для которого выполняется подписка на уведомления
+     */
     private void handleMonthlySubscription(Long chatId) {
         // Обработка подписки на уведомления ежемесячно
         // Вызов метода, который будет отправлять уведомления ежедневно
