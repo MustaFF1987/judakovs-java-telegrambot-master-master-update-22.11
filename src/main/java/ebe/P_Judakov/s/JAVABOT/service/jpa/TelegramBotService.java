@@ -21,8 +21,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import java.io.IOException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -85,7 +83,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
-            Long chatId = update.getMessage().getChatId();
+//          Long chatId = update.getMessage().getChatId();
 
             if (text.startsWith("/start") && keyboardMarkup == null) {
                 // Инициализация клавиатуры при старте чата
@@ -131,31 +129,124 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      *               Update используется для анализа и обработки входящих сообщений и команд от пользователя.
      * @throws TelegramApiException Исключение, которое может быть выброшено в процессе взаимодействия с API Telegram.
      */
+
+    private boolean isStopped = false; // Флаг для отслеживания состояния остановки бота
+
+    private boolean isSubscribed = false; // Флаг для отслеживания состояния подписки
+
     private void handleCommands(Update update) throws TelegramApiException {
         String text = update.getMessage().getText();
         Long chatId = update.getMessage().getChatId();
 
         if ("/start".equals(text)) {
+            if (isStopped) {
+                isStopped = false; // Если бот был остановлен, и пользователь нажал /start, сбрасываем флаг остановки
+            }
             sendWelcomeMessage(chatId, keyboardMarkup);
         } else if ("/help".equals(text)) {
-            String responseText = "Список доступных команд: /start, /help, /stop, /getStock, /subscribe, /unsubscribe";
+            String responseText = "Список доступных команд: /start, /help, /stop, /getStock";
+            if (!isStopped) {
+                if (isSubscribed) {
+                    responseText += ", /unsubscribe";
+                } else {
+                    responseText += ", /subscribe";
+                }
+            }
             sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
         } else if ("/subscribe".equals(text) || "Subscribe".equals(text)) {
-            handleSubscribeSchedule(chatId); // Вызываем метод handleSubscribeSchedule
+            isSubscribed = true; // Установка флага подписки
+            if (!isStopped) {
+                handleSubscribeSchedule(chatId);
+            }
         } else if ("/unsubscribe".equals(text) || "Unsubscribe".equals(text)) {
-            handleUnsubscribe(chatId);
-        } else {
-            if (userState.containsKey(chatId) && userState.get(chatId).equals("AWAITING_STOCK_TICKER")) {
+            isSubscribed = false; // Сброс флага подписки
+            if (!isStopped) {
+                handleUnsubscribe(chatId);
+            }
+        } else if ("Daily".equals(text)) {
+            if (!isStopped) {
+                handleDailySubscription(chatId);
+                removeButtonFromKeyboard("Daily");
+                sendUpdatedKeyboard(chatId, "Weekly", "Monthly");
+            }
+        } else if ("Weekly".equals(text)) {
+            if (!isStopped) {
+                handleWeeklySubscription(chatId);
+                removeButtonFromKeyboard("Weekly");
+                sendUpdatedKeyboard(chatId, "Daily", "Monthly");
+            }
+        } else if ("Monthly".equals(text)) {
+            if (!isStopped) {
+                handleMonthlySubscription(chatId);
+                removeButtonFromKeyboard("Monthly");
+                sendUpdatedKeyboard(chatId, "Daily", "Weekly");
+            }
+        } else if (userState.containsKey(chatId) && userState.get(chatId).equals("AWAITING_STOCK_TICKER")) {
+            if (!isStopped) {
                 handleStockTickerInput(chatId, text);
                 userState.remove(chatId);
-            } else if ("/getStock".equals(text)) {
+            }
+        } else if ("/getStock".equals(text)) {
+            if (!isStopped) {
                 userState.put(chatId, "AWAITING_STOCK_TICKER");
                 sendTextMessageWithKeyboard(chatId, "Введите название тикера акции:", keyboardMarkup);
+            }
+        } else if ("/stop".equals(text)) {
+            isStopped = true; // Устанавливаем флаг остановки после нажатия /stop
+            sendTextMessageWithKeyboard(chatId, "Бот остановлен. Нажмите /start для возобновления работы.", keyboardMarkup);
+        } else {
+            if (!isStopped) {
+                sendTextMessageWithKeyboard(chatId, "Введите корректную команду", keyboardMarkup);
             } else {
-                sendTextMessageWithKeyboard(chatId, "Введите корректную команду или название тикера акции", keyboardMarkup);
+                sendTextMessageWithKeyboard(chatId, "Бот остановлен. Нажмите /start для возобновления работы.", keyboardMarkup);
             }
         }
     }
+
+
+
+    // Метод для удаления кнопки из клавиатуры
+    private void removeButtonFromKeyboard(String buttonText) {
+        if (keyboardMarkup != null && keyboardMarkup.getKeyboard() != null) {
+            List<KeyboardRow> keyboard = keyboardMarkup.getKeyboard();
+
+            for (KeyboardRow row : keyboard) {
+                row.remove(buttonText);
+            }
+        }
+    }
+
+        // Метод для отправки обновленной клавиатуры пользователю без нажатой кнопки
+        private void sendUpdatedKeyboard(Long chatId, String... buttons) {
+            if (keyboardMarkup != null) {
+                ReplyKeyboardMarkup updatedKeyboard = new ReplyKeyboardMarkup();
+                updatedKeyboard.setSelective(true);
+                updatedKeyboard.setResizeKeyboard(true);
+                updatedKeyboard.setOneTimeKeyboard(false);
+
+                List<KeyboardRow> keyboard = new ArrayList<>();
+                KeyboardRow row = new KeyboardRow();
+
+                // Добавляем кнопки к новой клавиатуре
+                for (String button : buttons) {
+                    row.add(button);
+                }
+
+                keyboard.add(row);
+                updatedKeyboard.setKeyboard(keyboard);
+
+                SendMessage message = new SendMessage();
+                message.setChatId(chatId);
+                message.setText("Выберите новую подписку или нажмите /unsubscribe");
+                message.setReplyMarkup(updatedKeyboard);
+
+                try {
+                    execute(message);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
 
     private Map<Long, Boolean> subscriptionStatus = new HashMap<>();
 
@@ -167,24 +258,19 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         String responseText = "Вы подписались на уведомления от бота. Выберите частоту уведомлений:";
         ReplyKeyboardMarkup frequencyKeyboard = createFrequencyKeyboard();
         sendTextMessageWithKeyboard(chatId, responseText, frequencyKeyboard);
-
         // Сохраняем состояние подписки для данного чата
         subscriptionStatus.put(chatId, true);
-
         // Устанавливаем роль пользователя в системе
         jpaUserService.setUserRole(chatId, "USER");
-
         // Добавляем пустого бота в чат (возможно, для каких-то дополнительных действий)
         addEmptyBotToChat(chatId.toString());
     }
-
 
     private ReplyKeyboardMarkup createFrequencyKeyboard() {
         ReplyKeyboardMarkup frequencyKeyboard = new ReplyKeyboardMarkup();
         frequencyKeyboard.setSelective(true);
         frequencyKeyboard.setResizeKeyboard(true);
         frequencyKeyboard.setOneTimeKeyboard(false);
-
         List<KeyboardRow> keyboard = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
         row.add("Daily");
@@ -197,11 +283,9 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         return frequencyKeyboard;
     }
 
-
-
     private void handleDailySubscription(Long chatId) {
         // Обработка подписки на уведомления ежедневно
-        // Например, вызов метода, который будет отправлять уведомления ежедневно
+        // Вызов метода, который будет отправлять уведомления ежедневно
         // sendDailyNotifications(chatId);
 
         // Отправка сообщения подтверждения подписки
@@ -215,8 +299,8 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
 
     private void handleWeeklySubscription(Long chatId) {
-        // Обработка подписки на уведомления ежеднедельно
-        // Например, вызов метода, который будет отправлять уведомления ежедневно
+        // Обработка подписки на уведомления еженедельно
+        // Вызов метода, который будет отправлять уведомления ежедневно
         // sendDailyNotifications(chatId);
 
         // Отправка сообщения подтверждения подписки
@@ -230,7 +314,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
     private void handleMonthlySubscription(Long chatId) {
         // Обработка подписки на уведомления ежемесячно
-        // Например, вызов метода, который будет отправлять уведомления ежедневно
+        // Вызов метода, который будет отправлять уведомления ежедневно
         // sendDailyNotifications(chatId);
 
         // Отправка сообщения подтверждения подписки
@@ -240,31 +324,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-
-
-    /**
-     * Извлекает тикер акции из текста сообщения.
-     *
-     * @param text Текст сообщения пользователя.
-     * @return Тикер акции, если найден, иначе null.
-     */
-    private String getStockTickerFromMessage(String text) {
-        try {
-            // Regex выражение для извлечения тикера из текста сообщения
-            Pattern pattern = Pattern.compile("/getStock\\s+(\\S+)");
-            Matcher matcher = pattern.matcher(text);
-
-            if (matcher.find()) {
-                // Получаем найденное значение тикера
-                return matcher.group(1);
-            }
-        } catch (Exception e) {
-            // Обработка ошибок
-            e.printStackTrace();
-        }
-        return null;
     }
 
     /**
@@ -289,7 +348,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             }
         }
     }
-
 
     /**
      * Выполняет запрос информации о котировках акции через API, используя указанный тикер акции.
@@ -344,8 +402,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-
-
     /**
      * Метод-заглушка для отправки информации о котировках акции пользователю.
      * Пример реализации метода отправки информации о котировках акции, который может быть изменен
@@ -397,7 +453,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-
     /**
      * Метод для отправки текстового сообщения пользователю с использованием клавиатуры.
      *
@@ -416,28 +471,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             // Обработка возможных ошибок при отправке сообщения с клавиатурой
             e.printStackTrace();
         }
-    }
-
-    /**
-     * Метод для обработки подписки пользователя на уведомления от бота.
-     *
-     * @param chatId Идентификатор чата пользователя, который подписывается на уведомления.
-     * @throws TelegramApiException Исключение, которое может быть выброшено при работе с API Telegram.
-     */
-    private void handleSubscribe(Long chatId) throws TelegramApiException {
-        // Подписываем пользователя на уведомления
-        SubscriptionManager.subscribe(chatId);
-
-        // Формируем текст ответа и отправляем его с клавиатурой без кнопки подписки
-        String responseText = "Вы подписались на уведомления от бота.";
-        keyboardMarkup = removeSubscribeButton(keyboardMarkup);
-        sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
-
-        // Устанавливаем роль пользователя в системе
-        jpaUserService.setUserRole(chatId, "USER");
-
-        // Добавляем пустого бота в чат (возможно, для каких-то дополнительных действий)
-        addEmptyBotToChat(chatId.toString());
     }
 
     /**
