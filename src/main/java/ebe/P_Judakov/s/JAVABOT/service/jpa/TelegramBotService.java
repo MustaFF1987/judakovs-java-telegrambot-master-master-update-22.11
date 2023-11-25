@@ -130,9 +130,8 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      * @throws TelegramApiException Исключение, которое может быть выброшено в процессе взаимодействия с API Telegram.
      */
 
-    private boolean isStopped = false; // Флаг для отслеживания состояния остановки бота
-
     private boolean isSubscribed = false; // Флаг для отслеживания состояния подписки
+    private boolean isStopped = false; // Флаг для отслеживания состояния остановки бота
 
     private void handleCommands(Update update) throws TelegramApiException {
         String text = update.getMessage().getText();
@@ -159,9 +158,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
                 handleSubscribeSchedule(chatId);
             }
         } else if ("/unsubscribe".equals(text) || "Unsubscribe".equals(text)) {
-            isSubscribed = false; // Сброс флага подписки
-            if (!isStopped) {
-                handleUnsubscribe(chatId);
+            if (isSubscribed) {
+                isSubscribed = false; // Сброс флага подписки
+                if (!isStopped) {
+                    handleUnsubscribe(chatId);
+                }
+            } else {
+                sendTextMessageWithKeyboard(chatId, "Вы еще не подписаны, нажмите команду /subscribe", keyboardMarkup);
             }
         } else if ("Daily".equals(text)) {
             if (!isStopped) {
@@ -202,8 +205,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             }
         }
     }
-
-
 
     // Метод для удаления кнопки из клавиатуры
     private void removeButtonFromKeyboard(String buttonText) {
@@ -551,21 +552,21 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         return keyboardMarkup;
     }
 
-    /**
-     * Удаляет кнопку "Подписаться" из клавиатуры.
-     *
-     * @param keyboardMarkup Текущая клавиатура, из которой нужно удалить кнопку "Подписаться".
-     * @return Обновленная клавиатура без кнопки "Подписаться".
-     */
-    private ReplyKeyboardMarkup removeSubscribeButton(ReplyKeyboardMarkup keyboardMarkup) {
-        List<KeyboardRow> keyboard = keyboardMarkup.getKeyboard();
-
-        // Перебираем строки клавиатуры и удаляем кнопку "Subscribe"
-        for (KeyboardRow row : keyboard) {
-            row.removeIf(button -> "Subscribe".equals(button.getText()));
-        }
-        return keyboardMarkup;
-    }
+//    /**
+//     * Удаляет кнопку "Подписаться" из клавиатуры.
+//     *
+//     * @param keyboardMarkup Текущая клавиатура, из которой нужно удалить кнопку "Подписаться".
+//     * @return Обновленная клавиатура без кнопки "Подписаться".
+//     */
+//    private ReplyKeyboardMarkup removeSubscribeButton(ReplyKeyboardMarkup keyboardMarkup) {
+//        List<KeyboardRow> keyboard = keyboardMarkup.getKeyboard();
+//
+//        // Перебираем строки клавиатуры и удаляем кнопку "Subscribe"
+//        for (KeyboardRow row : keyboard) {
+//            row.removeIf(button -> "Subscribe".equals(button.getText()));
+//        }
+//        return keyboardMarkup;
+//    }
 
     /**
      * Создает клавиатуру с кнопками "Subscribe" и "Unsubscribe".
@@ -606,19 +607,19 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
 
 
-    /**
-     * Отправляет сообщение о завершении работы с ботом вместе с клавиатурой.
-     *
-     * @param chatId          Идентификатор чата с пользователем.
-     * @param keyboardMarkup  Клавиатура, используемая при отправке сообщения.
-     * @throws TelegramApiException В случае возникновения ошибки при отправке сообщения через Telegram API.
-     */
-    public void sendStopMessage(Long chatId, ReplyKeyboardMarkup keyboardMarkup) throws TelegramApiException {
-        String stopText = "Вы завершили работу с ботом.";
-        stopText += " До скорых встреч!";
-
-        sendTextMessageWithKeyboard(chatId, stopText, keyboardMarkup);
-    }
+//    /**
+//     * Отправляет сообщение о завершении работы с ботом вместе с клавиатурой.
+//     *
+//     * @param chatId          Идентификатор чата с пользователем.
+//     * @param keyboardMarkup  Клавиатура, используемая при отправке сообщения.
+//     * @throws TelegramApiException В случае возникновения ошибки при отправке сообщения через Telegram API.
+//     */
+//    public void sendStopMessage(Long chatId, ReplyKeyboardMarkup keyboardMarkup) throws TelegramApiException {
+//        String stopText = "Вы завершили работу с ботом.";
+//        stopText += " До скорых встреч!";
+//
+//        sendTextMessageWithKeyboard(chatId, stopText, keyboardMarkup);
+//    }
 
 
     /**
@@ -901,8 +902,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
                 // Если keyboardMarkup равен null, создаем и используем клавиатуру по умолчанию
                 ReplyKeyboardMarkup defaultKeyboard = new ReplyKeyboardMarkup();
                 defaultKeyboard.setResizeKeyboard(true);
-                // Добавьте кнопки по умолчанию, если нужно
-                // defaultKeyboard.setKeyboard(...);
 
                 // Устанавливаем клавиатуру по умолчанию
                 message.setReplyMarkup(defaultKeyboard);
@@ -1000,7 +999,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             // Вывод информации о котировках в логи
             System.out.println(message);
 
-            // Отправка сообщения пользователю с использованием кастомной клавиатуры
+            // Отправка сообщения пользователю с использованием custom клавиатуры
             sendCustomKeyboardMessage(chatId, message, keyboardMarkup);
         }
 
