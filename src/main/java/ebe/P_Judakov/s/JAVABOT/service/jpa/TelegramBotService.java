@@ -7,6 +7,7 @@ import ebe.P_Judakov.s.JAVABOT.controller.CombinedController;
 import ebe.P_Judakov.s.JAVABOT.domen.entity.jpa.EmptyBot;
 import ebe.P_Judakov.s.JAVABOT.domen.entity.jpa.JpaMessage;
 import ebe.P_Judakov.s.JAVABOT.repository.interfaces.SubscribedChannelRepository;
+import ebe.P_Judakov.s.JAVABOT.scheduler.ScheduleExecutor;
 import ebe.P_Judakov.s.JAVABOT.service.interfaces.IStockQuoteBot;
 import ebe.P_Judakov.s.JAVABOT.service.interfaces.UserService;
 import org.json.JSONObject;
@@ -36,6 +37,8 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      */
     @Qualifier("telegramBotService")
     private SubscribedChannelRepository subscribedChannelRepository;
+
+    private ScheduleExecutor scheduleExecutor;
 
     /**
      * Сервис для управления пользователями в базе данных.
@@ -83,7 +86,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
-//          Long chatId = update.getMessage().getChatId();
+            Long chatId = update.getMessage().getChatId();
 
             if (text.startsWith("/start") && keyboardMarkup == null) {
                 // Инициализация клавиатуры при старте чата
@@ -108,14 +111,14 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-    /**
-     * Вызывается при регистрации бота в Telegram.
-     * Этот метод вызывается автоматически библиотекой TelegramBots
-     * после успешной регистрации бота и позволяет выполнять дополнительные действия или настройки в момент регистрации.
-     *
-     * Переопределение данного метода позволяет выполнить дополнительные настройки бота после успешной регистрации
-     * в Telegram API перед началом обработки входящих сообщений и обновлений.
-     */
+         /**
+         * Вызывается при регистрации бота в Telegram.
+         * Этот метод вызывается автоматически библиотекой TelegramBots
+         * после успешной регистрации бота и позволяет выполнять дополнительные действия или настройки в момент регистрации.
+         *
+         * Переопределение данного метода позволяет выполнить дополнительные настройки бота после успешной регистрации
+         * в Telegram API перед началом обработки входящих сообщений и обновлений.
+         */
     @Override
     public void onRegister() {
         super.onRegister();
@@ -216,6 +219,50 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
+    //=================================================
+
+    private String createDailyNotificationContent(String stockTicker) {
+        // Логика формирования текста уведомления с использованием информации о выбранной акции
+        String stockQuoteInfo = fetchStockQuoteInfo(stockTicker);
+
+        // Формирование текста уведомления на основе информации о котировках акции
+        String notification = "Доброе утро! Вот актуальная информация по акции " + stockTicker + ":\n\n" + stockQuoteInfo;
+
+        return notification;
+    }
+
+    private void sendDailyNotifications(Long chatId, String stockTicker) {
+        // Логика формирования уведомлений с учетом тикера акции
+        String notification = createDailyNotificationContent(stockTicker);
+
+        try {
+            // Отправка уведомления пользователю
+            sendTextMessage(chatId, notification);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // Метод для обработки выбора пользователем подписки на ежедневную информацию
+    private void handleDailySubscription(Long chatId, String stockTicker) {
+        if (!isStopped) {
+            scheduleExecutor.scheduleDailyStockInfo(); // Запуск задачи для отправки ежедневной информации
+            removeButtonFromKeyboard("Daily");
+            sendUpdatedKeyboard(chatId, "Weekly", "Monthly");
+
+            // Отправка сообщения подтверждения подписки
+            String confirmationMessage = "Вы успешно подписались на ежедневные уведомления от бота.";
+            try {
+                sendTextMessage(chatId, confirmationMessage);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+
+    //=================================================
+
     /**
      * Метод для удаления кнопки из клавиатуры.
      * При вызове данного метода удаляется кнопка с указанным текстом из клавиатуры.
@@ -231,6 +278,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             }
         }
     }
+
 
     /**
      * Метод для отправки обновленной клавиатуры пользователю без нажатой кнопки.

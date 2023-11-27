@@ -11,6 +11,9 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @EnableScheduling
@@ -23,9 +26,14 @@ public class ScheduleExecutor extends TelegramLongPollingBot {
     @Autowired
     ApiClientService apiClientService;
 
-//    @Scheduled(cron = "0 0 9 * * ?") // Каждый день в 09:00
-//    private void handleDailySubscription(Long chatId) {
-//    }
+    // Создание планировщика задач
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    @Scheduled(cron = "0 0 9 * * ?") // Каждый день в 09:00
+    public void scheduleDailyStockInfo() {
+        // sendDailyStockInfoToUsers();
+    }
+
 
 //    @Scheduled(cron = "0 0 9 ? * MON") // Каждый понедельник в 09:00
 //    private void handleWeeklySubscription(Long chatId) {
@@ -52,5 +60,7 @@ public class ScheduleExecutor extends TelegramLongPollingBot {
     public void onRegister() {
         super.onRegister();
     }
+
+
 }
 
