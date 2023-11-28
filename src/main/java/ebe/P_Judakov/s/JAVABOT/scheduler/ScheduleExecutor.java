@@ -54,6 +54,7 @@ public class ScheduleExecutor extends TelegramLongPollingBot {
     }
 
     private void handleDailySubscription(Long chatId, String stockTicker) {
+        //реализация
     }
 
 

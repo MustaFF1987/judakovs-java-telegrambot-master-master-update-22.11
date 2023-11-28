@@ -1138,6 +1138,10 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
             // Отправка сообщения пользователю с использованием custom клавиатуры
             sendCustomKeyboardMessage(chatId, message, keyboardMarkup);
+
+            // Вызов метода для сохранения сообщения в базу данных
+            TelegramMessageHandler messageHandler = new TelegramMessageHandler();
+            messageHandler.handleMessage(chatId, message);
         }
 
 
