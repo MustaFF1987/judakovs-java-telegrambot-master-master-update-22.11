@@ -243,22 +243,22 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
         }
     }
 
-    // Метод для обработки выбора пользователем подписки на ежедневную информацию
-    private void handleDailySubscription(Long chatId, String stockTicker) {
-        if (!isStopped) {
-            scheduleExecutor.scheduleDailyStockInfo(); // Запуск задачи для отправки ежедневной информации
-            removeButtonFromKeyboard("Daily");
-            sendUpdatedKeyboard(chatId, "Weekly", "Monthly");
-
-            // Отправка сообщения подтверждения подписки
-            String confirmationMessage = "Вы успешно подписались на ежедневные уведомления от бота.";
-            try {
-                sendTextMessage(chatId, confirmationMessage);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+//    // Метод для обработки выбора пользователем подписки на ежедневную информацию
+//    private void handleDailySubscription(Long chatId, String stockTicker) {
+//        if (!isStopped) {
+//            scheduleExecutor.scheduleDailyStockInfo(); // Запуск задачи для отправки ежедневной информации
+//            removeButtonFromKeyboard("Daily");
+//            sendUpdatedKeyboard(chatId, "Weekly", "Monthly");
+//
+//            // Отправка сообщения подтверждения подписки
+//            String confirmationMessage = "Вы успешно подписались на ежедневные уведомления от бота.";
+//            try {
+//                sendTextMessage(chatId, confirmationMessage);
+//            } catch (Exception e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
+//    }
 
 
     //=================================================

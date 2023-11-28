@@ -57,21 +57,7 @@ public class JpaChat implements Chat {
     }
 
     @Override
-    public int getId() {
-        return id;
-    }
-
-    @Override
-    public int getChatId() {
-        return chatId;
-    }
-
-    @Override
-    public String getType() {
-        return type;
-    }
-
-    @Override
     public void addUser(JpaUser user) {
+
     }
 }

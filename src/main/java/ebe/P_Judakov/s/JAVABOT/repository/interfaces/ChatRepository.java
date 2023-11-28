@@ -4,6 +4,7 @@ import ebe.P_Judakov.s.JAVABOT.domen.entity.interfaces.Chat;
 import ebe.P_Judakov.s.JAVABOT.domen.entity.interfaces.Message;
 import ebe.P_Judakov.s.JAVABOT.domen.entity.interfaces.User;
 import ebe.P_Judakov.s.JAVABOT.domen.entity.jpa.JpaChat;
+import ebe.P_Judakov.s.JAVABOT.domen.entity.jpa.SubscribedChannel;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,7 @@ public interface ChatRepository {
 
     int countUsersByChat(Chat chat);
 
+    List<SubscribedChannel> findByChatId(int chatId);
 
     Optional<JpaChat> findById(int id);
 }
