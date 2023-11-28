@@ -32,6 +32,12 @@ import org.slf4j.LoggerFactory;
 @Service
 public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_Judakov.s.JAVABOT.service.interfaces.TelegramBotService {
 
+    private final TelegramMessageHandler messageHandler;
+
+    public TelegramBotService() {
+        this.messageHandler = new TelegramMessageHandler();
+    }
+
     /**
      * Репозиторий для управления подписанными каналами в базе данных.
      */
@@ -60,6 +66,7 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      */
     private CombinedController combinedController;
 
+
     /**
      * Логгер для записи информационных сообщений и ошибок в приложении.
      */
@@ -71,6 +78,8 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      */
     private Map<Long, String> userState = new HashMap<>();
 
+
+
     /**
      * Обрабатывает обновления, полученные из Telegram API.
      * Если приходит сообщение с текстом, выполняет обработку команд или входящих сообщений пользователя.
@@ -81,7 +90,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      */
     @Override
     public void onUpdateReceived(Update update) {
-        // Логируем приходящие обновления
         LOGGER.info("Received update: {}", update);
 
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -89,7 +97,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             Long chatId = update.getMessage().getChatId();
 
             if (text.startsWith("/start") && keyboardMarkup == null) {
-                // Инициализация клавиатуры при старте чата
                 keyboardMarkup = createKeyboardMarkup();
             }
             if (keyboardMarkup != null) {
@@ -100,9 +107,19 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
                     throw new RuntimeException(e);
                 }
             } else {
-                // Без клавиатуры
                 try {
+                    // Обработка входящего сообщения
                     processIncomingMessage(update);
+
+                    // Вызов метода для сохранения сообщения в базу данных
+                    TelegramMessageHandler messageHandler = new TelegramMessageHandler();
+                    if (update.getMessage().hasText()) {
+                        String textMessage = update.getMessage().getText();
+                        messageHandler.handleMessage(chatId, textMessage);
+                    } else if (update.getMessage().hasPhoto()) {
+                        String caption = update.getMessage().getCaption();
+                        messageHandler.handleMessage(chatId, caption);
+                    }
                 } catch (TelegramApiException e) {
                     LOGGER.error("Error processing Telegram API request", e);
                     throw new RuntimeException(e);
@@ -110,7 +127,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
             }
         }
     }
-
          /**
          * Вызывается при регистрации бота в Telegram.
          * Этот метод вызывается автоматически библиотекой TelegramBots
@@ -819,7 +835,6 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
      * @throws TelegramApiException В случае возникновения ошибки при обработке входящего сообщения через Telegram API.
      */
     public void processIncomingMessage(Update update) throws TelegramApiException {
-
         // Проверяем, есть ли сообщение в обновлении
         if (update.hasMessage()) {
             Long chatId = update.getMessage().getChatId(); // Получаем идентификатор чата
@@ -837,7 +852,13 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
                     // Отправка ответа пользователю с клавиатурой
                     sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
-                } else if (message.hasPhoto()) { // Проверяем, содержит ли сообщение фотографию
+
+                    // Вызов метода для сохранения сообщения в базу данных
+                    TelegramMessageHandler messageHandler = new TelegramMessageHandler();
+                    messageHandler.handleMessage(chatId, text);
+
+                 //    Проверяем, содержит ли сообщение фотографию
+                } else if (message.hasPhoto()) {
                     String caption = message.getCaption(); // Получаем подпись к фотографии
 
                     // Обработка сообщений с фотографиями
@@ -845,6 +866,11 @@ public class TelegramBotService extends TelegramLongPollingBot implements ebe.P_
 
                     // Отправка ответа пользователю с клавиатурой
                     sendTextMessageWithKeyboard(chatId, responseText, keyboardMarkup);
+
+                    // Вызов метода для сохранения сообщения в базу данных
+                    TelegramMessageHandler messageHandler = new TelegramMessageHandler();
+                    messageHandler.handleMessage(chatId, caption);
+
                 }
             } else {
                 // Действия, если клавиатура отсутствует

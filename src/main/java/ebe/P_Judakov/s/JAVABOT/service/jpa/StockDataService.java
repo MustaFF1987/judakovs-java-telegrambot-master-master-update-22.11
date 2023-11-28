@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Scanner;
+
 @Service
 public class StockDataService {
 
@@ -61,4 +63,11 @@ public class StockDataService {
             return null;
         }
     }
+
+    public String getStockTickerForDailyStockInfo() {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Введите тикер акции:");
+        return scanner.nextLine().toUpperCase(); // Приводим введенный тикер к верхнему регистру
+    }
+
 }
