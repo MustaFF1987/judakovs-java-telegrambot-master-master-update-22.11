@@ -16,7 +16,7 @@ import java.util.Optional;
 @Repository
 public class MySqlChatRepository implements ChatRepository {
 
-    private final EntityManager entityManager;
+    private EntityManager entityManager;
 
     public MySqlChatRepository(EntityManager entityManager) {
         this.entityManager = entityManager;

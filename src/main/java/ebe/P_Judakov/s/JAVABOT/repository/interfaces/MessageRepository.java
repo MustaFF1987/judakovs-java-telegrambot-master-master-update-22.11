@@ -9,7 +9,6 @@ import java.util.List;
 
 public interface MessageRepository {
 
-
     // Поиск сообщений, отправленных определенным пользователем:
     // Этот метод вернет список сообщений, отправленных указанным пользователем.
 
@@ -34,6 +33,4 @@ public interface MessageRepository {
     // Этот метод вернет общее количество сообщений в указанном чате.
 
     int countByChat(Chat chat);
-
-
 }
